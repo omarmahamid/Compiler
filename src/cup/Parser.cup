@@ -1,0 +1,263 @@
+/*************/
+/* Based on a template by Oren Ish-Shalom */
+/*************/
+
+
+/*************/
+/* IMPORTS */
+/*************/
+
+import java_cup.runtime.*;
+import ast.*;
+import java.util.List;
+import java.util.LinkedList;
+
+parser code
+{:
+	public Lexer lexer;
+
+	public Parser(Lexer lexer)
+	{
+		super(lexer);
+		this.lexer = lexer;
+	}
+
+	// Override default error reporting in parser
+	public void report_error(String message, Object info)
+	{
+	    System.err.print("Syntax error at line " + lexer.getLine() + " of input.\n");
+		System.exit(1);
+	}
+:}
+
+/************************/
+/* CUSTOMIZE CUP PARSER */
+/************************/
+scan with
+{:
+	Symbol s;
+    try {
+	s = lexer.next_token();
+	// System.out.print(s.sym);
+	// System.out.print("[");
+	// System.out.print(lexer.getLine());
+	// System.out.print(":");
+	// System.out.print(lexer.getCharPos());
+	// System.out.print("] ");
+	// System.out.print(sym.terminalNames[s.sym]);
+	// if (s.value != null)
+	// {
+	//	System.out.print("( ");
+	//	System.out.print(s.value);
+	//	System.out.print(" )");
+	// }
+	// System.out.print("\n");
+	return s;
+     } catch (java.lang.Error e) {
+         System.err.print("Syntax error at line " + lexer.getLine() + " of input.\n");
+         System.exit(1);
+         return null;
+     }
+:};
+
+/*************/
+/* TERMINALS */
+/*************/
+terminal PUBLIC, STATIC, VOID, MAIN;
+terminal CLASS, EXTENDS;
+terminal STRING, INT, BOOLEAN;
+terminal NEW, THIS, RETURN;
+terminal IF, ELSE, WHILE;
+terminal ASSIGN;
+terminal LENGTH;
+terminal LT, NOT, AND;
+terminal TRUE, FALSE;
+terminal PLUS, MINUS, MULT;
+terminal LPAREN, RPAREN, LCURLY_BRACK, RCURLY_BRACK, LSQUARE_BRACK, RSQUARE_BRACK;
+terminal PRINT_FUNC;
+terminal int INTEGER_LITERAL;
+terminal String IDENTIFIER;
+terminal COMMA, SEMICOLON, DOT;
+
+/*****************/
+/* NON TERMINALS */
+/*****************/
+
+non terminal Program Program;
+
+non terminal MainClass MainClass;
+
+non terminal ClassDecl ClassDecl;
+non terminal LinkedList<ClassDecl> ClassDeclList;
+
+non terminal MethodDecl MethodDecl;
+non terminal LinkedList<MethodDecl> MethodDeclList;
+
+non terminal FormalArg FormalParameter;
+non terminal LinkedList<FormalArg> FormalParameterList;
+non terminal LinkedList<FormalArg> FormalParameterListAndParens;
+
+non terminal VarDecl VarDeclaration;
+non terminal LinkedList<VarDecl> VarDeclarationList;
+
+non terminal Statement Statement;
+non terminal LinkedList<Statement> StatementList;
+
+non terminal Expr Expression;
+non terminal LinkedList<Expr> ExpressionList;
+non terminal LinkedList<Expr> MethodInvocationParameterList;
+
+non terminal String Identifier;
+
+non terminal AstType Type;
+
+non terminal ArrayLengthExpr ArrayLength;
+non terminal ArrayAccessExpr ArrayAccess;
+
+/***********************/
+/* OPERATOR PRECEDENCE */
+/***********************/
+
+precedence nonassoc ASSIGN;
+precedence left AND;
+precedence left LT;
+precedence left PLUS, MINUS;
+precedence left MULT;
+precedence right NOT, NEW;
+precedence left LSQUARE_BRACK;
+precedence left DOT;
+
+/************************/
+/* INITIAL NON TERMINAL */
+/************************/
+start with Program;
+
+/********************/
+/* PRODUCTION RULES */
+/********************/
+
+Program         ::= MainClass:m ClassDeclList:c {: RESULT = new Program(m, c); :};
+
+StatementList   ::= Statement:s StatementList:l
+            {: l.addFirst(s); RESULT = l; :}
+        |
+            {: RESULT = new LinkedList<Statement>(); :};
+
+MainClass       ::= CLASS:c Identifier:id LCURLY_BRACK PUBLIC STATIC VOID MAIN LPAREN STRING LSQUARE_BRACK RSQUARE_BRACK Identifier:args RPAREN LCURLY_BRACK Statement:stmt RCURLY_BRACK RCURLY_BRACK
+            {: RESULT = new MainClass(id, args, stmt); :};
+
+ClassDecl       ::= CLASS Identifier:i LCURLY_BRACK VarDeclarationList:v MethodDeclList:m RCURLY_BRACK
+            {: RESULT = new ClassDecl(i, null , v, m); :}  /*TODO: parent null?*/
+        | CLASS Identifier:i EXTENDS Identifier:parent LCURLY_BRACK VarDeclarationList:v MethodDeclList:m RCURLY_BRACK
+            {: RESULT = new ClassDecl(i, parent, v, m); :};
+
+ClassDeclList   ::=
+            {: RESULT = new LinkedList<ClassDecl>(); :}
+        | ClassDecl:c ClassDeclList:l
+            {: l.addFirst(c); RESULT = l; :};
+
+MethodDeclList  ::=
+            {: RESULT = new LinkedList<MethodDecl>(); :}
+        | MethodDecl:m MethodDeclList:l
+            {: l.addFirst(m); RESULT = l; :};
+
+MethodDecl      ::= PUBLIC:p Type:t Identifier:i FormalParameterListAndParens:params LCURLY_BRACK VarDeclarationList:vars StatementList:stmts RETURN Expression:rv SEMICOLON RCURLY_BRACK
+            {: RESULT = new MethodDecl(t, i, params, vars, stmts, rv, pleft); :};
+
+Statement       ::= Identifier:id ASSIGN Expression:expr SEMICOLON
+                {: RESULT = new AssignStatement(id, expr); :}
+            | IF:ifKeyword LPAREN Expression:expr RPAREN Statement:thenStmt ELSE Statement:elseStmt
+                {: RESULT = new IfStatement(expr, thenStmt, elseStmt); :}
+            | PRINT_FUNC:s LPAREN Expression:e RPAREN SEMICOLON
+                {: RESULT = new SysoutStatement(e); :}
+            | Identifier:id LSQUARE_BRACK Expression:e RSQUARE_BRACK ASSIGN Expression:v SEMICOLON
+                    {: RESULT = new AssignArrayStatement(id, e, v); :}
+            | WHILE:w LPAREN Expression:cond RPAREN Statement:s
+                    {: RESULT = new WhileStatement(cond, s); :}
+            | LCURLY_BRACK StatementList:s RCURLY_BRACK
+                    {: RESULT = new BlockStatement(s); :};
+
+Identifier      ::= IDENTIFIER:id
+                {: RESULT = id; :};
+
+Expression      ::= IDENTIFIER:name
+            {: RESULT = new IdentifierExpr(name); :}
+        | Expression:arg1 PLUS Expression:arg2
+            {: RESULT = new AddExpr(arg1, arg2); :}
+        | Expression:arg1 MINUS Expression:arg2
+            {: RESULT = new SubtractExpr(arg1, arg2); :}
+        | Expression:arg1 MULT Expression:arg2
+            {: RESULT = new MultExpr(arg1, arg2); :}
+        | Expression:arg1 LT Expression:arg2
+            {: RESULT = new LtExpr(arg1, arg2); :}
+        | Expression:arg1 AND Expression:arg2
+            {: RESULT = new AndExpr(arg1, arg2); :}
+        | LPAREN Expression:expr RPAREN
+            {: RESULT = expr; :}
+        | NOT:not Expression:expr
+            {: RESULT = new NotExpr(expr); :}
+        | TRUE:t
+            {: RESULT = new TrueExpr(); :}
+        | FALSE:f
+            {: RESULT = new FalseExpr(); :}
+        | THIS:t
+            {: RESULT = new ThisExpr(); :}
+        | NEW:n Identifier:i LPAREN RPAREN
+            {: RESULT = new NewObjectExpr(i); :}
+        | ArrayLength:l
+            {: RESULT = l; :}
+        | ArrayAccess:l
+            {: RESULT = l; :}
+        | NEW:n INT LSQUARE_BRACK Expression:e RSQUARE_BRACK
+            {: RESULT = new NewIntArrayExpr(e); :}
+        | Expression:e DOT Identifier:id MethodInvocationParameterList:l
+            {: RESULT = new MethodCallExpr(e, id, l); :}
+        | INTEGER_LITERAL:i
+            {: RESULT = new IntegerLiteralExpr(i); :};
+
+ArrayLength     ::= Expression:e DOT LENGTH
+            {: RESULT = new ArrayLengthExpr(e); :};
+
+ArrayAccess     ::= Expression:e LSQUARE_BRACK Expression:i RSQUARE_BRACK
+            {: RESULT = new ArrayAccessExpr(e, i); :};
+
+Type            ::= INT:i
+            {: RESULT = new IntAstType(); :}
+        | BOOLEAN:b
+            {: RESULT = new BoolAstType(); :}
+        | Identifier:i
+            {: RESULT = new RefType(i); :}
+        | INT:i LSQUARE_BRACK RSQUARE_BRACK
+            {: RESULT = new IntArrayAstType(); :};
+
+VarDeclaration  ::= Type:t Identifier:i SEMICOLON
+            {: RESULT = new VarDecl(t, i, tleft); :};
+
+VarDeclarationList ::=
+            {: RESULT = new LinkedList<VarDecl>(); :}
+        | VarDeclarationList:l VarDeclaration:e
+            {: RESULT = l; l.add(e); :};
+
+FormalParameter     ::= Type:t Identifier:i
+            {: RESULT = new FormalArg(t, i, tleft); :};
+
+FormalParameterListAndParens ::= LPAREN:l RPAREN
+            {: RESULT = new LinkedList<FormalArg>(); :}
+        | LPAREN FormalParameterList:params RPAREN
+            {: RESULT = params; :};
+
+FormalParameterList ::= FormalParameter:p COMMA FormalParameterList:l
+            {: l.addFirst(p); RESULT = l;  :}
+        | FormalParameter:p
+            {: RESULT = new LinkedList<FormalArg>(); RESULT.add(p); :};
+
+MethodInvocationParameterList ::= LPAREN:l RPAREN
+            {: RESULT = new LinkedList<Expr>(); :}
+        | LPAREN:l ExpressionList:e RPAREN
+            {: RESULT = e; :}
+        ;
+
+ExpressionList ::= Expression:e
+            {: RESULT = new LinkedList<Expr>(); RESULT.add(e); :}
+        | Expression:e COMMA ExpressionList:l
+            {: l.addFirst(e); RESULT = l; :};
