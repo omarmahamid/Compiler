@@ -67,24 +67,3 @@ tools/*
 
 mjava.jar
 	(*the* build)
-
-README.md
-	(<-- you are here)
-
-
-=== All those things with ex4?? ===
-Ignore them (for now; you know, Chekhov's gun and the like).
-
-=== Compiling the project ===
-ant
-
-=== Cleaning ===
-ant clean
-
-=== From AST XML to Java program ===
-java -jar mjavac.jar unmarshal print examples/BinaryTree.xml res.java
-
-=== From AST XML to... AST XML ===
-java -jar mjavac.jar unmarshal marshal examples/BinaryTree.xml res.xml
-
-(you will use the code for this "marhsal" option when generating ASTs in ex1,ex4)
